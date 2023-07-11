@@ -144,7 +144,7 @@ def get_marks():
                 total += float(details_text)
             subj = {"subjectName": subject_names[i].text, 'markByLetter': marks_by_letter[i].text,
                     'markByNumber': marks_by_numb[i].text, 'totalMarks': total}
-            print(subject_names[i].text)
+            #print(subject_names[i].text)
             data[i]=subj
         return jsonify(data)
 
