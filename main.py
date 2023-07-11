@@ -1,16 +1,20 @@
-from fastapi import FastAPI
+from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import re
-app= FastAPI()
 
-@app.get('/')
-def Home():
+app = Flask(__name__)
+
+@app.route('/')
+def home():
     return "@@@@@@@@@@@"
-@app.get('/get-marks')
-def Abouts(styId : int , password: int,semester:int):
 
+@app.route('/get-marks', methods=['GET'])
+def get_marks():
+    styId = request.args.get('styId')
+    password = request.args.get('password')
+    semester = request.args.get('semester')
 
     base_url = 'http://mygate.aiu.edu.sy:8080/'
     login_url = '/faces/ui/login.xhtml'
@@ -23,7 +27,7 @@ def Abouts(styId : int , password: int,semester:int):
     action_url = urljoin(base_url, form['action'])
 
     view_state = soup.find('input', {'name': 'javax.faces.ViewState'})['value']
-    
+
     form_data = {
         'lognForm': 'lognForm',
         'lognForm:j_idt19': f'{styId}',
@@ -36,7 +40,7 @@ def Abouts(styId : int , password: int,semester:int):
     response = session.post(action_url, data=form_data)
 
     if 'صحيحة' in response.text:
-        return "NOTTRUE";
+        return jsonify({'message': 'NOTTRUE'})
     else:
 
         if 'الفترة الحالية تقع ضمن فترة التسجيل' in response.text:
@@ -58,18 +62,14 @@ def Abouts(styId : int , password: int,semester:int):
             name = name.text.strip()
 
         session_id = soup.find("input", {"name": "javax.faces.ViewState"})["value"]
-        #print(session_id)
 
         soup = BeautifulSoup(response.text, 'html.parser')
 
         a = soup.find('a', {'class': 'ripplelink beenhere'})
 
-        Marks_Link = a.get('href')
+        marks_link = a.get('href')
 
-        print("@@@@")
-        url = urljoin(base_url, Marks_Link)
-
-
+        url = urljoin(base_url, marks_link)
 
         response = session.get(url)
         soup = BeautifulSoup(response.content, 'html.parser')  # Get Html content of login Page
@@ -101,27 +101,21 @@ def Abouts(styId : int , password: int,semester:int):
         result_table = result_table.find('tbody', {'id': 'contents:j_idt113_data'})
 
         pattern = re.compile('^contents:j_idt113:.*:j_idt118$')
-        subjectNames = result_table.find_all('label', {'id': pattern})
+        subject_names = result_table.find_all('label', {'id': pattern})
         pattern = re.compile('^contents:j_idt113:.*:(j_idt124|j_idt125)$')
-        marksByNumb = result_table.find_all('label', {'id': pattern})
-
-        # In[268]:
+        marks_by_numb = result_table.find_all('label', {'id': pattern})
 
         pattern = re.compile('^contents:j_idt113:.*:j_idt127$')
-        marksByLetter = result_table.find_all('label', {'id': pattern})
-        #print(marksByLetter)
+        marks_by_letter = result_table.find_all('label', {'id': pattern})
 
-        # In[269]:
-        print("@@@@@@@@@@@@@@@@@@@@@@")
+
+
         session_id = session.cookies.get('session_id')
 
         pattern = re.compile('^ui-widget-content ui-datatable-(even|odd)$')
         get_all_subs = result_table.find_all('tr', {'class': pattern})
         num_subs = len(get_all_subs)
 
-        print("@@@@@@@@@@@@@@@@@@@@@@")
-
-        # In[282]:
         data = {}
         for i in range(num_subs):
             form_data = {
@@ -136,8 +130,7 @@ def Abouts(styId : int , password: int,semester:int):
                 "javax.faces.ViewState": view_state
             }
             url = urljoin(base_url, "/faces/ui/pages/student/courseResult/index.xhtml")
-            # print(url)
-            print()
+
             response = session.post(url, data=form_data)
             soup = BeautifulSoup(response.content, 'html.parser')
             result_table = soup.find('update')
@@ -149,14 +142,11 @@ def Abouts(styId : int , password: int,semester:int):
             for mark in details_table:
                 details_text = mark.text.strip()
                 total += float(details_text)
-            subj = {"subjectName": subjectNames[i].text, 'markByLetter': marksByLetter[i].text,
-                    'markByNumber': marksByNumb[i].text, 'totalMarks': total}
-
+            subj = {"subjectName": subject_names[i].text, 'markByLetter': marks_by_letter[i].text,
+                    'markByNumber': marks_by_numb[i].text, 'totalMarks': total}
+            print(subject_names[i].text)
             data[i]=subj
-        return data;
+        return jsonify(data)
 
-
-
-
-
-
+if __name__=="__main__":
+    app.run(debug=True)
